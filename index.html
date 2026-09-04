@@ -406,90 +406,102 @@
     return lines.join("\n").trim();
   }
 
-  var committedText = "";
-  var sessionFinal = "";
+  // ---------------------------------------------------------------
+  //  SPEECH RECOGNITION  (duplication-proof accumulator model)
+  //
+  //  baseText        = raw text committed BEFORE the current recognition
+  //                    instance started (previous note + finished utterances).
+  //  lastFinalIndex  = how many result slots of the CURRENT instance we've
+  //                    already folded into baseText. We only ever add a slot
+  //                    ONCE, keyed by index — so Android re-firing the same
+  //                    final result can't double it.
+  //  Cleanup runs on the WHOLE combined string for display, never on
+  //  fragments, so nothing gets half-cleaned and jumbled.
+  // ---------------------------------------------------------------
+  var baseText = "";
+  var lastFinalIndex = 0;
 
-  function renderNote(interim) {
-    var raw = sessionFinal;
-    if (interim) raw += " " + interim;
-    var cleanedSession = cleanupText(raw);
-    var joined;
-    if (committedText.trim() && cleanedSession) {
-      var sep = /\n$/.test(committedText) ? "" : " ";
-      joined = committedText.trim() + sep + cleanedSession;
-    } else {
-      joined = committedText.trim() || cleanedSession || "";
-    }
-    noteEl.textContent = joined;
+  function joinRaw(a, b) {
+    a = (a || "").replace(/\s+$/, "");
+    b = (b || "").replace(/^\s+/, "");
+    if (!a) return b;
+    if (!b) return a;
+    return a + " " + b;
+  }
+
+  function render(interim) {
+    var combined = joinRaw(baseText, interim || "");
+    noteEl.textContent = cleanupText(combined);
     saveDraft();
   }
 
-  // ---------------------------------------------------------------
-  //  SPEECH RECOGNITION
-  // ---------------------------------------------------------------
   function startRecognition() {
     if (!SpeechRecognition) {
       setStatus("Speech recognition not supported. Use Chrome.", false);
       alert("Voice input isn't supported here. On Android, open this in Google Chrome.");
       return;
     }
+
+    // Seed baseText from whatever is already in the editor (raw-ish is fine;
+    // cleanupText is idempotent enough for display).
+    baseText = noteEl.textContent || "";
+
+    recognizing = true;
+    micBtn.textContent = "⏹ Stop Recording";
+    micBtn.className = "mic-btn recording";
+    setStatus("Listening… speak now", true);
+    beginInstance();
+  }
+
+  // Start ONE recognition instance. Not continuous: Chrome finalizes and ends
+  // on a natural pause; while still recording we spin up a FRESH instance,
+  // which resets result indexing so nothing carries over.
+  function beginInstance() {
     recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
-
-    committedText = noteEl.textContent || "";
-    sessionFinal = "";
-
-    recognition.onstart = function () {
-      recognizing = true;
-      micBtn.textContent = "⏹ Stop Recording";
-      micBtn.className = "mic-btn recording";
-      setStatus("Listening… speak now", true);
-    };
+    lastFinalIndex = 0;
 
     recognition.onresult = function (event) {
-      var finalStr = "";
       var interim = "";
       for (var i = 0; i < event.results.length; i++) {
         var chunk = event.results[i][0].transcript;
-        if (event.results[i].isFinal) finalStr += chunk + " ";
-        else interim += chunk;
+        if (event.results[i].isFinal) {
+          if (i >= lastFinalIndex) {
+            baseText = joinRaw(baseText, chunk);
+            lastFinalIndex = i + 1;   // never fold this slot again
+          }
+        } else {
+          interim = joinRaw(interim, chunk);
+        }
       }
-      sessionFinal = finalStr;
-      renderNote(interim);
+      render(interim);
       if (interim.trim()) setStatus("… " + interim, true);
       else if (recognizing) setStatus("Listening…", true);
     };
 
     recognition.onerror = function (e) {
-      if (e.error === "no-speech") { setStatus("No speech detected, still listening…", true); return; }
+      if (e.error === "no-speech") { setStatus("Listening…", true); return; }
+      if (e.error === "aborted") { return; }
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         recognizing = false;
         setStatus("Microphone blocked. Allow mic access for this site.", false);
         micBtn.textContent = "🎤 Start Recording";
         micBtn.className = "mic-btn";
-      } else if (e.error === "aborted") {
-        // benign
       } else {
         setStatus("Error: " + e.error, false);
       }
     };
 
     recognition.onend = function () {
-      var cleanedSession = cleanupText(sessionFinal);
-      if (cleanedSession) {
-        var base = committedText.trim();
-        if (base) {
-          var sep = /\n$/.test(committedText) ? "" : " ";
-          committedText = base + sep + cleanedSession;
-        } else {
-          committedText = cleanedSession;
-        }
-      }
-      sessionFinal = "";
       if (recognizing) {
-        try { recognition.start(); } catch (e) {}
+        // natural pause ended this utterance — start a fresh instance to
+        // keep listening. Fresh instance => index resets, baseText already
+        // holds everything, so no re-adding.
+        try { beginInstance(); } catch (e) {
+          setTimeout(function () { if (recognizing) beginInstance(); }, 250);
+        }
       } else {
         micBtn.textContent = "🎤 Start Recording";
         micBtn.className = "mic-btn";
@@ -504,6 +516,9 @@
   function stopRecognition() {
     recognizing = false;
     if (recognition) { try { recognition.stop(); } catch (e) {} }
+    // finalize the display with a clean pass
+    noteEl.textContent = cleanupText(baseText);
+    saveDraft();
     micBtn.textContent = "🎤 Start Recording";
     micBtn.className = "mic-btn";
     setStatus("Stopped");
