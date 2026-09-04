@@ -113,7 +113,6 @@
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   var recognizing = false;
   var recognition = null;
-  var finalTranscript = "";   // accumulated raw finalized speech
 
   // ---- restore saved note ----
   try {
@@ -200,16 +199,30 @@
     return lines.join("\n").trim();
   }
 
-  function appendCleaned(rawChunk) {
-    var cleaned = cleanupText(rawChunk);
-    if (!cleaned) return;
-    var existing = noteEl.textContent.trim();
-    if (existing) {
-      var sep = /\n$/.test(existing) ? "" : " ";
-      noteEl.textContent = existing + sep + cleaned;
+  // committedText = everything from before the CURRENT listening session
+  // (previous notes + folded-in results from earlier restarts).
+  // sessionFinal   = finalized text for the CURRENT recognition instance only.
+  // Rebuilt fresh from event.results each time, so Android re-firing the
+  // same results OVERWRITES instead of appending — no more double-writing.
+  var committedText = "";
+  var sessionFinal = "";
+
+  function renderNote(interim) {
+    var raw = sessionFinal;
+    if (interim) raw += " " + interim;
+    var cleanedSession = cleanupText(raw);
+    var parts = [];
+    if (committedText.trim()) parts.push(committedText.trim());
+    if (cleanedSession) parts.push(cleanedSession);
+    // join committed + this session with a space (or newline if committed ends in one)
+    var joined;
+    if (parts.length === 2) {
+      var sep = /\n$/.test(committedText) ? "" : " ";
+      joined = committedText.trim() + sep + cleanedSession;
     } else {
-      noteEl.textContent = cleaned;
+      joined = parts[0] || "";
     }
+    noteEl.textContent = joined;
     saveNote();
   }
 
@@ -227,7 +240,11 @@
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
-    finalTranscript = "";
+
+    // start a fresh listening session: fold whatever is already in the note
+    // into committedText, and reset the session buffer.
+    committedText = noteEl.textContent || "";
+    sessionFinal = "";
 
     recognition.onstart = function () {
       recognizing = true;
@@ -237,31 +254,53 @@
     };
 
     recognition.onresult = function (event) {
+      // Rebuild the ENTIRE session transcript from scratch every event.
+      // Android re-delivers results; rebuilding means re-fired results
+      // overwrite rather than stack.
+      var finalStr = "";
       var interim = "";
-      for (var i = event.resultIndex; i < event.results.length; i++) {
+      for (var i = 0; i < event.results.length; i++) {
         var chunk = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          appendCleaned(chunk);
-        } else {
-          interim += chunk;
-        }
+        if (event.results[i].isFinal) finalStr += chunk + " ";
+        else interim += chunk;
       }
-      if (interim) setStatus("… " + interim, true);
+      sessionFinal = finalStr;
+      renderNote(interim);
+      if (interim.trim()) setStatus("… " + interim, true);
       else if (recognizing) setStatus("Listening…", true);
     };
 
     recognition.onerror = function (e) {
       if (e.error === "no-speech") { setStatus("No speech detected, still listening…", true); return; }
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        recognizing = false;
         setStatus("Microphone blocked. Allow mic access for this site.", false);
+        micBtn.textContent = "🎤 Start Recording";
+        micBtn.className = "mic-btn";
+      } else if (e.error === "aborted") {
+        // benign — happens on manual stop
       } else {
         setStatus("Error: " + e.error, false);
       }
     };
 
     recognition.onend = function () {
-      // Chrome stops after silence; auto-restart while user still wants to record
+      // Fold this finished session's finalized text into committedText so the
+      // NEXT auto-restart starts from a clean, already-rendered base.
+      var cleanedSession = cleanupText(sessionFinal);
+      if (cleanedSession) {
+        var base = committedText.trim();
+        if (base) {
+          var sep = /\n$/.test(committedText) ? "" : " ";
+          committedText = base + sep + cleanedSession;
+        } else {
+          committedText = cleanedSession;
+        }
+      }
+      sessionFinal = "";
+
       if (recognizing) {
+        // Chrome stopped after silence; restart to keep listening.
         try { recognition.start(); } catch (e) {}
       } else {
         micBtn.textContent = "🎤 Start Recording";
