@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#4f46e5" />
+<title>Voice Notes</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --accent: #4f46e5;
+    --accent-hot: #ef4444;
+    --text: #e9eaf0;
+    --muted: #9096a6;
+    --border: #2a2e3c;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    height: 100%;
+  }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  header {
+    padding: 16px; text-align: center;
+    border-bottom: 1px solid var(--border);
+    font-size: 18px; font-weight: 600;
+  }
+  header .sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .status {
+    text-align: center; font-size: 13px; color: var(--muted);
+    min-height: 18px;
+  }
+  .status.live { color: var(--accent-hot); font-weight: 600; }
+  .note {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px;
+    min-height: 180px; font-size: 16px; line-height: 1.5;
+    white-space: pre-wrap; word-wrap: break-word;
+    -webkit-user-select: text; user-select: text;
+  }
+  .note:empty::before {
+    content: "Your cleaned-up notes will appear here. Tap the mic and start talking.";
+    color: var(--muted);
+  }
+  .interim { color: var(--muted); font-style: italic; }
+  .controls { display: flex; gap: 10px; }
+  button {
+    flex: 1; border: none; border-radius: 12px;
+    padding: 16px; font-size: 16px; font-weight: 600;
+    color: #fff; background: var(--accent);
+    cursor: pointer; transition: transform 0.05s, background 0.2s;
+  }
+  button:active { transform: scale(0.97); }
+  button.secondary { background: #2a2e3c; }
+  button.recording { background: var(--accent-hot); animation: pulse 1.2s infinite; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+  .row { display: flex; gap: 10px; }
+  .mic-btn { font-size: 18px; }
+  footer { padding: 10px 16px 20px; text-align: center; font-size: 11px; color: var(--muted); }
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: #22c55e; color: #062; padding: 10px 18px; border-radius: 20px;
+    font-size: 14px; font-weight: 600; opacity: 0; transition: opacity 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <header>
+    🎙️ Voice Notes
+    <div class="sub">Talk → clean text → copy anywhere</div>
+  </header>
+
+  <main>
+    <div id="status" class="status">Ready</div>
+    <div id="note" class="note" contenteditable="true"></div>
+
+    <div class="controls">
+      <button id="micBtn" class="mic-btn">🎤 Start Recording</button>
+    </div>
+
+    <div class="row">
+      <button id="copyBtn" class="secondary">📋 Copy</button>
+      <button id="shareBtn" class="secondary">↗ Share</button>
+      <button id="clearBtn" class="secondary">🗑 Clear</button>
+    </div>
+  </main>
+
+  <footer>
+    Works offline · Cleanup runs on your phone · Add to Home Screen to use like an app
+  </footer>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var noteEl = document.getElementById("note");
+  var statusEl = document.getElementById("status");
+  var micBtn = document.getElementById("micBtn");
+  var copyBtn = document.getElementById("copyBtn");
+  var shareBtn = document.getElementById("shareBtn");
+  var clearBtn = document.getElementById("clearBtn");
+  var toastEl = document.getElementById("toast");
+
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recognizing = false;
+  var recognition = null;
+  var finalTranscript = "";   // accumulated raw finalized speech
+
+  // ---- restore saved note ----
+  try {
+    var saved = localStorage.getItem("voiceNote");
+    if (saved) noteEl.textContent = saved;
+  } catch (e) {}
+
+  function saveNote() {
+    try { localStorage.setItem("voiceNote", noteEl.textContent); } catch (e) {}
+  }
+
+  function setStatus(msg, live) {
+    statusEl.textContent = msg;
+    statusEl.className = "status" + (live ? " live" : "");
+  }
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.className = "toast show";
+    setTimeout(function () { toastEl.className = "toast"; }, 1600);
+  }
+
+  // ---------------------------------------------------------------
+  //  TEXT CLEANUP  (all on-device, no network)
+  // ---------------------------------------------------------------
+  var FILLERS = ["um", "uh", "erm", "hmm", "like", "you know", "i mean",
+                 "sort of", "kind of", "basically", "actually", "literally"];
+
+  // Spoken punctuation commands -> symbols
+  var SPOKEN_PUNCT = [
+    [/\b(new line|newline|next line)\b/gi, "\n"],
+    [/\b(new paragraph|next paragraph)\b/gi, "\n\n"],
+    [/\bnew bullet\b/gi, "\n- "],
+    [/\b(full stop|period)\b/gi, "."],
+    [/\bcomma\b/gi, ","],
+    [/\bquestion mark\b/gi, "?"],
+    [/\bexclamation (mark|point)\b/gi, "!"],
+    [/\bcolon\b/gi, ":"],
+    [/\bsemicolon\b/gi, ";"],
+    [/\bdash\b/gi, " - "]
+  ];
+
+  function cleanupText(raw) {
+    if (!raw || !raw.trim()) return "";
+    var t = " " + raw.trim() + " ";
+
+    // apply spoken punctuation commands
+    for (var i = 0; i < SPOKEN_PUNCT.length; i++) {
+      t = t.replace(SPOKEN_PUNCT[i][0], SPOKEN_PUNCT[i][1]);
+    }
+
+    // remove filler words (word-boundary, case-insensitive)
+    for (var f = 0; f < FILLERS.length; f++) {
+      var re = new RegExp("\\b" + FILLERS[f].replace(/ /g, "\\s+") + "\\b", "gi");
+      t = t.replace(re, " ");
+    }
+
+    // collapse whitespace (but keep intentional newlines)
+    t = t.replace(/[ \t]+/g, " ");
+    t = t.replace(/ *\n */g, "\n");
+    t = t.replace(/\n{3,}/g, "\n\n");
+
+    // tidy spacing around punctuation
+    t = t.replace(/\s+([.,!?;:])/g, "$1");
+    t = t.replace(/([.,!?;:])(?=[^\s\n])/g, "$1 ");
+
+    // capitalize first letter of each sentence
+    t = t.replace(/(^|[.!?]\s+|\n)([a-z])/g, function (m, p1, p2) {
+      return p1 + p2.toUpperCase();
+    });
+
+    // capitalize standalone "i"
+    t = t.replace(/\bi\b/g, "I");
+
+    // ensure sentence-ending punctuation on plain lines
+    var lines = t.split("\n").map(function (line) {
+      line = line.trim();
+      if (!line) return "";
+      if (line.charAt(0) === "-") return line;             // bullet, leave as is
+      if (/[.!?:]$/.test(line)) return line;
+      return line + ".";
+    });
+
+    return lines.join("\n").trim();
+  }
+
+  function appendCleaned(rawChunk) {
+    var cleaned = cleanupText(rawChunk);
+    if (!cleaned) return;
+    var existing = noteEl.textContent.trim();
+    if (existing) {
+      var sep = /\n$/.test(existing) ? "" : " ";
+      noteEl.textContent = existing + sep + cleaned;
+    } else {
+      noteEl.textContent = cleaned;
+    }
+    saveNote();
+  }
+
+  // ---------------------------------------------------------------
+  //  SPEECH RECOGNITION
+  // ---------------------------------------------------------------
+  function startRecognition() {
+    if (!SpeechRecognition) {
+      setStatus("Speech recognition not supported in this browser. Use Chrome.", false);
+      alert("Voice input isn't supported here. On Android, open this in Google Chrome.");
+      return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+    finalTranscript = "";
+
+    recognition.onstart = function () {
+      recognizing = true;
+      micBtn.textContent = "⏹ Stop Recording";
+      micBtn.className = "mic-btn recording";
+      setStatus("Listening… speak now", true);
+    };
+
+    recognition.onresult = function (event) {
+      var interim = "";
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var chunk = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          appendCleaned(chunk);
+        } else {
+          interim += chunk;
+        }
+      }
+      if (interim) setStatus("… " + interim, true);
+      else if (recognizing) setStatus("Listening…", true);
+    };
+
+    recognition.onerror = function (e) {
+      if (e.error === "no-speech") { setStatus("No speech detected, still listening…", true); return; }
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        setStatus("Microphone blocked. Allow mic access for this site.", false);
+      } else {
+        setStatus("Error: " + e.error, false);
+      }
+    };
+
+    recognition.onend = function () {
+      // Chrome stops after silence; auto-restart while user still wants to record
+      if (recognizing) {
+        try { recognition.start(); } catch (e) {}
+      } else {
+        micBtn.textContent = "🎤 Start Recording";
+        micBtn.className = "mic-btn";
+        setStatus("Stopped");
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch (e) {
+      setStatus("Could not start mic. Tap again.", false);
+    }
+  }
+
+  function stopRecognition() {
+    recognizing = false;
+    if (recognition) { try { recognition.stop(); } catch (e) {} }
+    micBtn.textContent = "🎤 Start Recording";
+    micBtn.className = "mic-btn";
+    setStatus("Stopped");
+  }
+
+  micBtn.addEventListener("click", function () {
+    if (recognizing) stopRecognition();
+    else startRecognition();
+  });
+
+  // ---------------------------------------------------------------
+  //  COPY / SHARE / CLEAR
+  // ---------------------------------------------------------------
+  copyBtn.addEventListener("click", function () {
+    var text = noteEl.textContent.trim();
+    if (!text) { toast("Nothing to copy"); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { toast("Copied!"); },
+        function () { legacyCopy(text); }
+      );
+    } else {
+      legacyCopy(text);
+    }
+  });
+
+  function legacyCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); toast("Copied!"); }
+    catch (e) { toast("Copy failed — select manually"); }
+    document.body.removeChild(ta);
+  }
+
+  shareBtn.addEventListener("click", function () {
+    var text = noteEl.textContent.trim();
+    if (!text) { toast("Nothing to share"); return; }
+    if (navigator.share) {
+      navigator.share({ text: text }).catch(function () {});
+    } else {
+      toast("Share not supported — use Copy");
+    }
+  });
+
+  clearBtn.addEventListener("click", function () {
+    if (!noteEl.textContent.trim()) return;
+    if (confirm("Clear the current note?")) {
+      noteEl.textContent = "";
+      saveNote();
+      toast("Cleared");
+    }
+  });
+
+  // persist manual edits too
+  noteEl.addEventListener("input", saveNote);
+
+  if (!SpeechRecognition) {
+    setStatus("Open in Chrome for voice input", false);
+  }
+})();
+</script>
+</body>
+</html>
