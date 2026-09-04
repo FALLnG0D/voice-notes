@@ -24,61 +24,92 @@
   }
   body { display: flex; flex-direction: column; min-height: 100vh; }
   header {
-    padding: 16px; text-align: center;
+    padding: 14px 12px; display: flex; align-items: center; gap: 8px;
     border-bottom: 1px solid var(--border);
-    font-size: 18px; font-weight: 600;
   }
-  header .sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  header .title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; }
+  header .iconbtn {
+    background: none; border: none; color: var(--text);
+    font-size: 20px; padding: 6px 10px; width: auto; flex: 0 0 auto;
+    border-radius: 8px;
+  }
+  header .iconbtn:active { background: var(--border); }
+
   main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-  .status {
-    text-align: center; font-size: 13px; color: var(--muted);
-    min-height: 18px;
-  }
+
+  .status { text-align: center; font-size: 13px; color: var(--muted); min-height: 18px; }
   .status.live { color: var(--accent-hot); font-weight: 600; }
+
+  .titleInput {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; font-size: 15px; font-weight: 600;
+    width: 100%;
+  }
+  .titleInput::placeholder { color: var(--muted); font-weight: 400; }
+
   .note {
     background: var(--card); border: 1px solid var(--border);
     border-radius: 12px; padding: 14px;
-    min-height: 180px; font-size: 16px; line-height: 1.5;
+    min-height: 150px; font-size: 16px; line-height: 1.5;
     white-space: pre-wrap; word-wrap: break-word;
     -webkit-user-select: text; user-select: text;
   }
   .note:empty::before {
-    content: "Your cleaned-up notes will appear here. Tap the mic and start talking.";
+    content: "Tap the mic and start talking. Your cleaned-up text appears here.";
     color: var(--muted);
   }
-  .interim { color: var(--muted); font-style: italic; }
+
   .controls { display: flex; gap: 10px; }
   button {
     flex: 1; border: none; border-radius: 12px;
-    padding: 16px; font-size: 16px; font-weight: 600;
+    padding: 15px; font-size: 15px; font-weight: 600;
     color: #fff; background: var(--accent);
     cursor: pointer; transition: transform 0.05s, background 0.2s;
   }
   button:active { transform: scale(0.97); }
   button.secondary { background: #2a2e3c; }
   button.recording { background: var(--accent-hot); animation: pulse 1.2s infinite; }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.save { background: #22c55e; color: #052e16; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
   .row { display: flex; gap: 10px; }
-  .mic-btn { font-size: 18px; }
+  .mic-btn { font-size: 17px; }
+
   footer { padding: 10px 16px 20px; text-align: center; font-size: 11px; color: var(--muted); }
+
   .toast {
     position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-    background: #22c55e; color: #062; padding: 10px 18px; border-radius: 20px;
+    background: #22c55e; color: #052e16; padding: 10px 18px; border-radius: 20px;
     font-size: 14px; font-weight: 600; opacity: 0; transition: opacity 0.25s;
-    pointer-events: none;
+    pointer-events: none; z-index: 10;
   }
   .toast.show { opacity: 1; }
+
+  /* ---- notes list view ---- */
+  .hidden { display: none !important; }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .list-empty { text-align: center; color: var(--muted); margin-top: 40px; font-size: 15px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .card .body { flex: 1; min-width: 0; }
+  .card .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .meta { font-size: 12px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .open { flex: 0 0 auto; width: auto; background: var(--accent); padding: 8px 12px; font-size: 13px; }
+  .card .del { flex: 0 0 auto; width: auto; background: transparent; color: var(--accent-hot); padding: 8px 10px; font-size: 18px; }
 </style>
 </head>
 <body>
   <header>
-    🎙️ Voice Notes
-    <div class="sub">Talk → clean text → copy anywhere</div>
+    <button id="listBtn" class="iconbtn" title="My notes">☰</button>
+    <div class="title" id="headerTitle">🎙️ Voice Notes</div>
+    <button id="newBtn" class="iconbtn" title="New note">➕</button>
   </header>
 
-  <main>
+  <!-- ============ EDITOR VIEW ============ -->
+  <main id="editorView">
     <div id="status" class="status">Ready</div>
+    <input id="titleInput" class="titleInput" type="text" placeholder="Note title (optional)" />
     <div id="note" class="note" contenteditable="true"></div>
 
     <div class="controls">
@@ -86,14 +117,22 @@
     </div>
 
     <div class="row">
+      <button id="saveBtn" class="save">💾 Save</button>
       <button id="copyBtn" class="secondary">📋 Copy</button>
+    </div>
+    <div class="row">
       <button id="shareBtn" class="secondary">↗ Share</button>
       <button id="clearBtn" class="secondary">🗑 Clear</button>
     </div>
   </main>
 
+  <!-- ============ NOTES LIST VIEW ============ -->
+  <main id="listView" class="hidden">
+    <div id="listContainer" class="list"></div>
+  </main>
+
   <footer>
-    Works offline · Cleanup runs on your phone · Add to Home Screen to use like an app
+    Works offline · Saved on this phone · Add to Home Screen to use like an app
   </footer>
 
   <div id="toast" class="toast"></div>
@@ -102,27 +141,213 @@
 (function () {
   "use strict";
 
+  // ---- elements ----
+  var editorView = document.getElementById("editorView");
+  var listView = document.getElementById("listView");
+  var listContainer = document.getElementById("listContainer");
+  var headerTitle = document.getElementById("headerTitle");
+
   var noteEl = document.getElementById("note");
+  var titleInput = document.getElementById("titleInput");
   var statusEl = document.getElementById("status");
   var micBtn = document.getElementById("micBtn");
+  var saveBtn = document.getElementById("saveBtn");
   var copyBtn = document.getElementById("copyBtn");
   var shareBtn = document.getElementById("shareBtn");
   var clearBtn = document.getElementById("clearBtn");
+  var listBtn = document.getElementById("listBtn");
+  var newBtn = document.getElementById("newBtn");
   var toastEl = document.getElementById("toast");
 
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   var recognizing = false;
   var recognition = null;
 
-  // ---- restore saved note ----
-  try {
-    var saved = localStorage.getItem("voiceNote");
-    if (saved) noteEl.textContent = saved;
-  } catch (e) {}
+  // ---------------------------------------------------------------
+  //  STORAGE MODEL  (multi-note filing system, all local)
+  //  notes: array of { id, title, text, updated }
+  //  currentId: id of the note open in the editor (null = unsaved new note)
+  // ---------------------------------------------------------------
+  var STORE_KEY = "voiceNotes_v2";
+  var DRAFT_KEY = "voiceNotes_draft";   // in-progress unsaved editor content
+  var notes = [];
+  var currentId = null;
 
-  function saveNote() {
-    try { localStorage.setItem("voiceNote", noteEl.textContent); } catch (e) {}
+  function loadNotes() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      notes = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(notes)) notes = [];
+    } catch (e) { notes = []; }
   }
+
+  function persistNotes() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(notes)); } catch (e) {}
+  }
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        id: currentId, title: titleInput.value, text: noteEl.textContent
+      }));
+    } catch (e) {}
+  }
+
+  function loadDraft() {
+    try {
+      var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (d) {
+        currentId = d.id || null;
+        titleInput.value = d.title || "";
+        noteEl.textContent = d.text || "";
+      }
+    } catch (e) {}
+  }
+
+  // ---- one-time migration from the old single-note key ----
+  (function migrateOld() {
+    try {
+      var old = localStorage.getItem("voiceNote");
+      if (old && old.trim()) {
+        loadNotes();
+        var exists = notes.some(function (n) { return n.text === old; });
+        if (!exists) {
+          notes.unshift(makeNote(old));
+          persistNotes();
+        }
+        localStorage.removeItem("voiceNote");
+      }
+    } catch (e) {}
+  })();
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function autoTitle(text) {
+    var first = (text || "").trim().split("\n")[0].replace(/^[-•\s]+/, "").trim();
+    if (!first) return "Untitled note";
+    return first.length > 40 ? first.slice(0, 40) + "…" : first;
+  }
+
+  function makeNote(text, title) {
+    return { id: uid(), title: (title || "").trim(), text: text || "", updated: Date.now() };
+  }
+
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    var now = new Date();
+    var opts = { hour: "numeric", minute: "2-digit" };
+    if (d.toDateString() === now.toDateString()) return "Today " + d.toLocaleTimeString([], opts);
+    return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], opts);
+  }
+
+  // ---------------------------------------------------------------
+  //  VIEW SWITCHING
+  // ---------------------------------------------------------------
+  function showEditor() {
+    listView.classList.add("hidden");
+    editorView.classList.remove("hidden");
+    headerTitle.textContent = "🎙️ Voice Notes";
+  }
+
+  function showList() {
+    if (recognizing) stopRecognition();
+    renderList();
+    editorView.classList.add("hidden");
+    listView.classList.remove("hidden");
+    headerTitle.textContent = "My Notes (" + notes.length + ")";
+  }
+
+  function renderList() {
+    listContainer.innerHTML = "";
+    if (!notes.length) {
+      var empty = document.createElement("div");
+      empty.className = "list-empty";
+      empty.textContent = "No saved notes yet. Record one and tap 💾 Save.";
+      listContainer.appendChild(empty);
+      return;
+    }
+    var sorted = notes.slice().sort(function (a, b) { return b.updated - a.updated; });
+    sorted.forEach(function (n) {
+      var card = document.createElement("div");
+      card.className = "card";
+
+      var body = document.createElement("div");
+      body.className = "body";
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = n.title || autoTitle(n.text);
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      var preview = (n.text || "").replace(/\n/g, " ").trim().slice(0, 50);
+      meta.textContent = fmtDate(n.updated) + (preview ? " · " + preview : "");
+      body.appendChild(name); body.appendChild(meta);
+
+      var openBtn = document.createElement("button");
+      openBtn.className = "open"; openBtn.textContent = "Open";
+      openBtn.addEventListener("click", function () { openNote(n.id); });
+
+      var delBtn = document.createElement("button");
+      delBtn.className = "del"; delBtn.textContent = "🗑";
+      delBtn.addEventListener("click", function () { deleteNote(n.id); });
+
+      card.appendChild(body); card.appendChild(openBtn); card.appendChild(delBtn);
+      listContainer.appendChild(card);
+    });
+  }
+
+  function openNote(id) {
+    var n = notes.find(function (x) { return x.id === id; });
+    if (!n) return;
+    currentId = n.id;
+    titleInput.value = n.title || "";
+    noteEl.textContent = n.text || "";
+    saveDraft();
+    showEditor();
+  }
+
+  function deleteNote(id) {
+    var n = notes.find(function (x) { return x.id === id; });
+    if (!n) return;
+    if (!confirm('Delete "' + (n.title || autoTitle(n.text)) + '"?')) return;
+    notes = notes.filter(function (x) { return x.id !== id; });
+    persistNotes();
+    if (currentId === id) { currentId = null; }
+    renderList();
+    headerTitle.textContent = "My Notes (" + notes.length + ")";
+    toast("Deleted");
+  }
+
+  function newNote() {
+    if (recognizing) stopRecognition();
+    currentId = null;
+    titleInput.value = "";
+    noteEl.textContent = "";
+    saveDraft();
+    showEditor();
+    toast("New note");
+  }
+
+  function saveCurrent() {
+    var text = noteEl.textContent.trim();
+    if (!text) { toast("Nothing to save"); return; }
+    var title = titleInput.value.trim();
+    if (currentId) {
+      var n = notes.find(function (x) { return x.id === currentId; });
+      if (n) { n.text = text; n.title = title; n.updated = Date.now(); }
+      else { var nn = makeNote(text, title); nn.id = currentId; notes.unshift(nn); }
+    } else {
+      var created = makeNote(text, title);
+      currentId = created.id;
+      notes.unshift(created);
+    }
+    persistNotes();
+    saveDraft();
+    toast("Saved ✓");
+  }
+
+  // ---- restore in-progress draft on load ----
+  loadNotes();
+  loadDraft();
 
   function setStatus(msg, live) {
     statusEl.textContent = msg;
@@ -141,7 +366,6 @@
   var FILLERS = ["um", "uh", "erm", "hmm", "like", "you know", "i mean",
                  "sort of", "kind of", "basically", "actually", "literally"];
 
-  // Spoken punctuation commands -> symbols
   var SPOKEN_PUNCT = [
     [/\b(new line|newline|next line)\b/gi, "\n"],
     [/\b(new paragraph|next paragraph)\b/gi, "\n\n"],
@@ -158,52 +382,30 @@
   function cleanupText(raw) {
     if (!raw || !raw.trim()) return "";
     var t = " " + raw.trim() + " ";
-
-    // apply spoken punctuation commands
     for (var i = 0; i < SPOKEN_PUNCT.length; i++) {
       t = t.replace(SPOKEN_PUNCT[i][0], SPOKEN_PUNCT[i][1]);
     }
-
-    // remove filler words (word-boundary, case-insensitive)
     for (var f = 0; f < FILLERS.length; f++) {
       var re = new RegExp("\\b" + FILLERS[f].replace(/ /g, "\\s+") + "\\b", "gi");
       t = t.replace(re, " ");
     }
-
-    // collapse whitespace (but keep intentional newlines)
     t = t.replace(/[ \t]+/g, " ");
     t = t.replace(/ *\n */g, "\n");
     t = t.replace(/\n{3,}/g, "\n\n");
-
-    // tidy spacing around punctuation
     t = t.replace(/\s+([.,!?;:])/g, "$1");
     t = t.replace(/([.,!?;:])(?=[^\s\n])/g, "$1 ");
-
-    // capitalize first letter of each sentence
-    t = t.replace(/(^|[.!?]\s+|\n)([a-z])/g, function (m, p1, p2) {
-      return p1 + p2.toUpperCase();
-    });
-
-    // capitalize standalone "i"
+    t = t.replace(/(^|[.!?]\s+|\n)([a-z])/g, function (m, p1, p2) { return p1 + p2.toUpperCase(); });
     t = t.replace(/\bi\b/g, "I");
-
-    // ensure sentence-ending punctuation on plain lines
     var lines = t.split("\n").map(function (line) {
       line = line.trim();
       if (!line) return "";
-      if (line.charAt(0) === "-") return line;             // bullet, leave as is
+      if (line.charAt(0) === "-") return line;
       if (/[.!?:]$/.test(line)) return line;
       return line + ".";
     });
-
     return lines.join("\n").trim();
   }
 
-  // committedText = everything from before the CURRENT listening session
-  // (previous notes + folded-in results from earlier restarts).
-  // sessionFinal   = finalized text for the CURRENT recognition instance only.
-  // Rebuilt fresh from event.results each time, so Android re-firing the
-  // same results OVERWRITES instead of appending — no more double-writing.
   var committedText = "";
   var sessionFinal = "";
 
@@ -211,19 +413,15 @@
     var raw = sessionFinal;
     if (interim) raw += " " + interim;
     var cleanedSession = cleanupText(raw);
-    var parts = [];
-    if (committedText.trim()) parts.push(committedText.trim());
-    if (cleanedSession) parts.push(cleanedSession);
-    // join committed + this session with a space (or newline if committed ends in one)
     var joined;
-    if (parts.length === 2) {
+    if (committedText.trim() && cleanedSession) {
       var sep = /\n$/.test(committedText) ? "" : " ";
       joined = committedText.trim() + sep + cleanedSession;
     } else {
-      joined = parts[0] || "";
+      joined = committedText.trim() || cleanedSession || "";
     }
     noteEl.textContent = joined;
-    saveNote();
+    saveDraft();
   }
 
   // ---------------------------------------------------------------
@@ -231,18 +429,15 @@
   // ---------------------------------------------------------------
   function startRecognition() {
     if (!SpeechRecognition) {
-      setStatus("Speech recognition not supported in this browser. Use Chrome.", false);
+      setStatus("Speech recognition not supported. Use Chrome.", false);
       alert("Voice input isn't supported here. On Android, open this in Google Chrome.");
       return;
     }
-
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
 
-    // start a fresh listening session: fold whatever is already in the note
-    // into committedText, and reset the session buffer.
     committedText = noteEl.textContent || "";
     sessionFinal = "";
 
@@ -254,9 +449,6 @@
     };
 
     recognition.onresult = function (event) {
-      // Rebuild the ENTIRE session transcript from scratch every event.
-      // Android re-delivers results; rebuilding means re-fired results
-      // overwrite rather than stack.
       var finalStr = "";
       var interim = "";
       for (var i = 0; i < event.results.length; i++) {
@@ -278,15 +470,13 @@
         micBtn.textContent = "🎤 Start Recording";
         micBtn.className = "mic-btn";
       } else if (e.error === "aborted") {
-        // benign — happens on manual stop
+        // benign
       } else {
         setStatus("Error: " + e.error, false);
       }
     };
 
     recognition.onend = function () {
-      // Fold this finished session's finalized text into committedText so the
-      // NEXT auto-restart starts from a clean, already-rendered base.
       var cleanedSession = cleanupText(sessionFinal);
       if (cleanedSession) {
         var base = committedText.trim();
@@ -298,9 +488,7 @@
         }
       }
       sessionFinal = "";
-
       if (recognizing) {
-        // Chrome stopped after silence; restart to keep listening.
         try { recognition.start(); } catch (e) {}
       } else {
         micBtn.textContent = "🎤 Start Recording";
@@ -309,11 +497,8 @@
       }
     };
 
-    try {
-      recognition.start();
-    } catch (e) {
-      setStatus("Could not start mic. Tap again.", false);
-    }
+    try { recognition.start(); }
+    catch (e) { setStatus("Could not start mic. Tap again.", false); }
   }
 
   function stopRecognition() {
@@ -325,30 +510,23 @@
   }
 
   micBtn.addEventListener("click", function () {
-    if (recognizing) stopRecognition();
-    else startRecognition();
+    if (recognizing) stopRecognition(); else startRecognition();
   });
 
   // ---------------------------------------------------------------
-  //  COPY / SHARE / CLEAR
+  //  COPY / SHARE / CLEAR / SAVE / NEW / LIST
   // ---------------------------------------------------------------
   copyBtn.addEventListener("click", function () {
     var text = noteEl.textContent.trim();
     if (!text) { toast("Nothing to copy"); return; }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        function () { toast("Copied!"); },
-        function () { legacyCopy(text); }
-      );
-    } else {
-      legacyCopy(text);
-    }
+      navigator.clipboard.writeText(text).then(function () { toast("Copied!"); }, function () { legacyCopy(text); });
+    } else { legacyCopy(text); }
   });
 
   function legacyCopy(text) {
     var ta = document.createElement("textarea");
-    ta.value = text; document.body.appendChild(ta);
-    ta.select();
+    ta.value = text; document.body.appendChild(ta); ta.select();
     try { document.execCommand("copy"); toast("Copied!"); }
     catch (e) { toast("Copy failed — select manually"); }
     document.body.removeChild(ta);
@@ -357,28 +535,28 @@
   shareBtn.addEventListener("click", function () {
     var text = noteEl.textContent.trim();
     if (!text) { toast("Nothing to share"); return; }
-    if (navigator.share) {
-      navigator.share({ text: text }).catch(function () {});
-    } else {
-      toast("Share not supported — use Copy");
-    }
+    if (navigator.share) { navigator.share({ text: text }).catch(function () {}); }
+    else { toast("Share not supported — use Copy"); }
   });
 
   clearBtn.addEventListener("click", function () {
     if (!noteEl.textContent.trim()) return;
-    if (confirm("Clear the current note?")) {
-      noteEl.textContent = "";
-      saveNote();
-      toast("Cleared");
+    if (confirm("Clear the text in this editor? (Saved notes are not affected.)")) {
+      noteEl.textContent = ""; titleInput.value = ""; currentId = null;
+      saveDraft(); toast("Cleared");
     }
   });
 
-  // persist manual edits too
-  noteEl.addEventListener("input", saveNote);
+  saveBtn.addEventListener("click", saveCurrent);
+  newBtn.addEventListener("click", newNote);
+  listBtn.addEventListener("click", function () {
+    if (listView.classList.contains("hidden")) showList(); else showEditor();
+  });
 
-  if (!SpeechRecognition) {
-    setStatus("Open in Chrome for voice input", false);
-  }
+  noteEl.addEventListener("input", saveDraft);
+  titleInput.addEventListener("input", saveDraft);
+
+  if (!SpeechRecognition) setStatus("Open in Chrome for voice input", false);
 })();
 </script>
 </body>

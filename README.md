@@ -13,6 +13,11 @@ after the page loads. Your notes never leave your device.
 
 - **🎤 Record** — one big button. Tap to start, tap to stop. It keeps
   listening through natural pauses.
+- **🗂️ Save many notes** — tap **💾 Save** to file the current note. Tap **➕**
+  to start a fresh note without losing others, and **☰** to see all your saved
+  notes (newest first). Open, edit, copy, share, or delete any of them. Each
+  note has an optional title (auto-filled from the first line if you leave it
+  blank). Everything is stored on your phone.
 - **✨ Cleans up as you talk** — capitalizes sentences, fixes `i` → `I`,
   removes filler words (*um, uh, like, you know, basically…*), tidies spacing,
   and adds periods so the text reads like writing, not a transcript.
