@@ -7,103 +7,198 @@
 <title>Voice Notes</title>
 <style>
   :root {
-    --bg: #0f1117;
-    --card: #1a1d27;
-    --accent: #4f46e5;
-    --accent-hot: #ef4444;
-    --text: #e9eaf0;
-    --muted: #9096a6;
-    --border: #2a2e3c;
+    --bg: #0b0d12;
+    --bg-elev: #12151d;
+    --card: #161a23;
+    --card-hover: #1c212c;
+    --accent: #6366f1;
+    --accent-2: #818cf8;
+    --accent-hot: #f43f5e;
+    --ok: #22c55e;
+    --text: #eef0f6;
+    --muted: #8b91a3;
+    --border: #242936;
+    --shadow: 0 6px 20px rgba(0,0,0,0.35);
+    --radius: 16px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0;
-    background: var(--bg); color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    height: 100%;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(99,102,241,0.12), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    min-height: 100%;
+    -webkit-font-smoothing: antialiased;
   }
-  body { display: flex; flex-direction: column; min-height: 100vh; }
+  body {
+    display: flex; flex-direction: column; min-height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* ---- header ---- */
   header {
-    padding: 14px 12px; display: flex; align-items: center; gap: 8px;
+    position: sticky; top: 0; z-index: 20;
+    padding: 14px 14px;
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(11,13,18,0.85);
+    backdrop-filter: saturate(140%) blur(12px);
     border-bottom: 1px solid var(--border);
   }
-  header .title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; }
-  header .iconbtn {
-    background: none; border: none; color: var(--text);
-    font-size: 20px; padding: 6px 10px; width: auto; flex: 0 0 auto;
-    border-radius: 8px;
+  header .brand { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  header .brand .logo {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.5);
   }
-  header .iconbtn:active { background: var(--border); }
+  header .brand .title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  header .iconbtn {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    font-size: 18px; height: 40px; width: 40px; flex: 0 0 auto;
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, transform 0.05s;
+  }
+  header .iconbtn:active { background: var(--card-hover); transform: scale(0.94); }
 
-  main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  main { flex: 1; padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 16px; }
 
-  .status { text-align: center; font-size: 13px; color: var(--muted); min-height: 18px; }
-  .status.live { color: var(--accent-hot); font-weight: 600; }
+  .status {
+    text-align: center; font-size: 13px; color: var(--muted); min-height: 18px;
+    letter-spacing: 0.01em;
+  }
+  .status.live { color: var(--accent-2); font-weight: 600; }
 
   .titleInput {
     background: var(--card); border: 1px solid var(--border); color: var(--text);
-    border-radius: 10px; padding: 10px 12px; font-size: 15px; font-weight: 600;
-    width: 100%;
+    border-radius: 12px; padding: 13px 14px; font-size: 16px; font-weight: 600;
+    width: 100%; transition: border-color 0.15s;
   }
-  .titleInput::placeholder { color: var(--muted); font-weight: 400; }
+  .titleInput:focus { outline: none; border-color: var(--accent); }
+  .titleInput::placeholder { color: var(--muted); font-weight: 500; }
 
   .note {
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px;
-    min-height: 150px; font-size: 16px; line-height: 1.5;
+    border-radius: var(--radius); padding: 16px;
+    min-height: 160px; font-size: 16.5px; line-height: 1.55;
     white-space: pre-wrap; word-wrap: break-word;
+    box-shadow: var(--shadow);
     -webkit-user-select: text; user-select: text;
+    transition: border-color 0.15s;
   }
+  .note:focus { outline: none; border-color: var(--accent); }
   .note:empty::before {
     content: "Tap the mic and start talking. Your cleaned-up text appears here.";
     color: var(--muted);
   }
 
-  .controls { display: flex; gap: 10px; }
-  button {
-    flex: 1; border: none; border-radius: 12px;
-    padding: 15px; font-size: 15px; font-weight: 600;
-    color: #fff; background: var(--accent);
-    cursor: pointer; transition: transform 0.05s, background 0.2s;
+  /* ---- circular mic button (centerpiece) ---- */
+  .mic-wrap { display: flex; justify-content: center; padding: 6px 0 2px; }
+  .mic-btn {
+    width: 78px; height: 78px; border-radius: 50%;
+    border: none; color: #fff; font-size: 30px; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 8px 24px rgba(99,102,241,0.45);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.08s, box-shadow 0.2s, background 0.2s;
   }
-  button:active { transform: scale(0.97); }
-  button.secondary { background: #2a2e3c; }
-  button.recording { background: var(--accent-hot); animation: pulse 1.2s infinite; }
-  button.save { background: #22c55e; color: #052e16; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+  .mic-btn:active { transform: scale(0.93); }
+  .mic-btn.recording {
+    background: linear-gradient(135deg, var(--accent-hot), #fb7185);
+    box-shadow: 0 0 0 0 rgba(244,63,94,0.6);
+    animation: ring 1.4s infinite;
+  }
+  @keyframes ring {
+    0%   { box-shadow: 0 0 0 0 rgba(244,63,94,0.55); }
+    70%  { box-shadow: 0 0 0 18px rgba(244,63,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(244,63,94,0); }
+  }
+  .mic-hint { text-align: center; font-size: 12px; color: var(--muted); margin-top: -4px; }
+
+  /* ---- generic buttons / rows ---- */
   .row { display: flex; gap: 10px; }
-  .mic-btn { font-size: 17px; }
-
-  footer { padding: 10px 16px 20px; text-align: center; font-size: 11px; color: var(--muted); }
-
-  .toast {
-    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-    background: #22c55e; color: #052e16; padding: 10px 18px; border-radius: 20px;
-    font-size: 14px; font-weight: 600; opacity: 0; transition: opacity 0.25s;
-    pointer-events: none; z-index: 10;
+  .btn {
+    flex: 1; border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px; font-size: 14.5px; font-weight: 600;
+    color: var(--text); background: var(--card);
+    cursor: pointer; transition: transform 0.05s, background 0.15s, border-color 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .toast.show { opacity: 1; }
+  .btn:active { transform: scale(0.97); background: var(--card-hover); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; color: #fff; }
+  .btn.ok { background: rgba(34,197,94,0.14); border-color: rgba(34,197,94,0.4); color: #86efac; }
+
+  /* ---- format toolbar ---- */
+  .fmtbar { display: flex; gap: 8px; }
+  .fmtbar button {
+    flex: 1; background: transparent; border: 1px dashed var(--border);
+    color: var(--muted); padding: 9px; font-size: 13px; font-weight: 600; border-radius: 10px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .fmtbar button:active { background: var(--card); color: var(--text); }
+
+  /* ---- search ---- */
+  .searchWrap { padding: 0; }
+  .searchInput {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 12px; padding: 13px 14px; font-size: 15.5px; width: 100%;
+  }
+  .searchInput:focus { outline: none; border-color: var(--accent); }
+  .searchInput::placeholder { color: var(--muted); }
+
+  footer {
+    padding: 12px 16px calc(18px + env(safe-area-inset-bottom));
+    text-align: center; font-size: 11px; color: var(--muted);
+  }
+
+  /* ---- toast ---- */
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%) translateY(8px);
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    background: var(--accent); color: #fff; padding: 12px 20px; border-radius: 24px;
+    font-size: 14px; font-weight: 600; opacity: 0; transition: opacity 0.22s, transform 0.22s;
+    pointer-events: none; z-index: 40; box-shadow: var(--shadow);
+    max-width: 90vw;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.undo { background: #1f2430; border: 1px solid var(--border); pointer-events: auto; cursor: pointer; }
+  .toast .undo-link { color: var(--accent-2); font-weight: 700; margin-left: 12px; text-decoration: underline; }
 
   /* ---- notes list view ---- */
   .hidden { display: none !important; }
-  .list { display: flex; flex-direction: column; gap: 10px; }
-  .list-empty { text-align: center; color: var(--muted); margin-top: 40px; font-size: 15px; }
+  .list { display: flex; flex-direction: column; gap: 12px; }
+  .list-empty { text-align: center; color: var(--muted); margin-top: 48px; font-size: 15px; }
   .card {
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+    border-radius: var(--radius); padding: 14px; display: flex; align-items: center; gap: 12px;
+    box-shadow: var(--shadow); transition: background 0.15s, transform 0.05s;
   }
+  .card:active { background: var(--card-hover); }
   .card .body { flex: 1; min-width: 0; }
-  .card .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .card .meta { font-size: 12px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .card .open { flex: 0 0 auto; width: auto; background: var(--accent); padding: 8px 12px; font-size: 13px; }
-  .card .del { flex: 0 0 auto; width: auto; background: transparent; color: var(--accent-hot); padding: 8px 10px; font-size: 18px; }
+  .card .name { font-size: 15.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .meta { font-size: 12.5px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .open {
+    flex: 0 0 auto; width: auto; background: rgba(99,102,241,0.16); border: 1px solid rgba(99,102,241,0.4);
+    color: var(--accent-2); padding: 9px 14px; font-size: 13px; font-weight: 600; border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .card .open:active { background: rgba(99,102,241,0.3); }
+  .card .del {
+    flex: 0 0 auto; width: 40px; height: 40px; background: transparent; border: none;
+    color: var(--accent-hot); font-size: 18px; border-radius: 10px;
+  }
+  .card .del:active { background: rgba(244,63,94,0.15); }
 </style>
 </head>
 <body>
   <header>
     <button id="listBtn" class="iconbtn" title="My notes">☰</button>
-    <div class="title" id="headerTitle">🎙️ Voice Notes</div>
-    <button id="newBtn" class="iconbtn" title="New note">➕</button>
+    <div class="brand">
+      <div class="logo">🎙️</div>
+      <div class="title" id="headerTitle">Voice Notes</div>
+    </div>
+    <button id="newBtn" class="iconbtn" title="New note">＋</button>
   </header>
 
   <!-- ============ EDITOR VIEW ============ -->
@@ -112,22 +207,34 @@
     <input id="titleInput" class="titleInput" type="text" placeholder="Note title (optional)" />
     <div id="note" class="note" contenteditable="true"></div>
 
-    <div class="controls">
-      <button id="micBtn" class="mic-btn">🎤 Start Recording</button>
+    <div class="fmtbar">
+      <button id="fmtBullet" title="Add a bullet">• Bullet</button>
+      <button id="fmtDivider" title="Add a divider line">— Divider</button>
+      <button id="fmtStamp" title="Insert current date/time">🕒 Time</button>
     </div>
 
+    <div class="mic-wrap">
+      <button id="micBtn" class="mic-btn" title="Record">🎤</button>
+    </div>
+    <div class="mic-hint" id="micHint">Tap to record</div>
+
     <div class="row">
-      <button id="saveBtn" class="save">💾 Save</button>
-      <button id="copyBtn" class="secondary">📋 Copy</button>
+      <button id="saveBtn" class="btn ok">💾 Save</button>
+      <button id="copyBtn" class="btn">📋 Copy</button>
     </div>
     <div class="row">
-      <button id="shareBtn" class="secondary">↗ Share</button>
-      <button id="clearBtn" class="secondary">🗑 Clear</button>
+      <button id="shareBtn" class="btn">↗ Share</button>
+      <button id="fileBtn" class="btn">⬇ File</button>
+      <button id="clearBtn" class="btn">🗑 Clear</button>
     </div>
   </main>
 
   <!-- ============ NOTES LIST VIEW ============ -->
   <main id="listView" class="hidden">
+    <div class="searchWrap">
+      <input id="searchInput" class="searchInput" type="text" placeholder="🔎 Search notes…" />
+    </div>
+    <button id="backupBtn" class="btn">⬇ Back up all notes to a file</button>
     <div id="listContainer" class="list"></div>
   </main>
 
@@ -151,13 +258,20 @@
   var titleInput = document.getElementById("titleInput");
   var statusEl = document.getElementById("status");
   var micBtn = document.getElementById("micBtn");
+  var micHint = document.getElementById("micHint");
   var saveBtn = document.getElementById("saveBtn");
   var copyBtn = document.getElementById("copyBtn");
   var shareBtn = document.getElementById("shareBtn");
+  var fileBtn = document.getElementById("fileBtn");
   var clearBtn = document.getElementById("clearBtn");
   var listBtn = document.getElementById("listBtn");
   var newBtn = document.getElementById("newBtn");
   var toastEl = document.getElementById("toast");
+  var searchInput = document.getElementById("searchInput");
+  var backupBtn = document.getElementById("backupBtn");
+  var fmtBullet = document.getElementById("fmtBullet");
+  var fmtDivider = document.getElementById("fmtDivider");
+  var fmtStamp = document.getElementById("fmtStamp");
 
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   var recognizing = false;
@@ -246,7 +360,7 @@
   function showEditor() {
     listView.classList.add("hidden");
     editorView.classList.remove("hidden");
-    headerTitle.textContent = "🎙️ Voice Notes";
+    headerTitle.textContent = "Voice Notes";
   }
 
   function showList() {
@@ -259,6 +373,14 @@
 
   function renderList() {
     listContainer.innerHTML = "";
+    var q = (searchInput.value || "").trim().toLowerCase();
+    var sorted = notes.slice().sort(function (a, b) { return b.updated - a.updated; });
+    if (q) {
+      sorted = sorted.filter(function (n) {
+        return (n.title || "").toLowerCase().indexOf(q) !== -1 ||
+               (n.text || "").toLowerCase().indexOf(q) !== -1;
+      });
+    }
     if (!notes.length) {
       var empty = document.createElement("div");
       empty.className = "list-empty";
@@ -266,7 +388,13 @@
       listContainer.appendChild(empty);
       return;
     }
-    var sorted = notes.slice().sort(function (a, b) { return b.updated - a.updated; });
+    if (!sorted.length) {
+      var none = document.createElement("div");
+      none.className = "list-empty";
+      none.textContent = 'No notes match "' + searchInput.value.trim() + '".';
+      listContainer.appendChild(none);
+      return;
+    }
     sorted.forEach(function (n) {
       var card = document.createElement("div");
       card.className = "card";
@@ -305,6 +433,9 @@
     showEditor();
   }
 
+  var lastDeleted = null;      // { note, timer } for undo
+  function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 15); } catch (e) {} }
+
   function deleteNote(id) {
     var n = notes.find(function (x) { return x.id === id; });
     if (!n) return;
@@ -314,7 +445,25 @@
     if (currentId === id) { currentId = null; }
     renderList();
     headerTitle.textContent = "My Notes (" + notes.length + ")";
-    toast("Deleted");
+    buzz(20);
+
+    // stash for undo (single-level; a new delete replaces the previous)
+    if (lastDeleted && lastDeleted.timer) clearTimeout(lastDeleted.timer);
+    var timer = setTimeout(function () { lastDeleted = null; hideToast(); }, 5000);
+    lastDeleted = { note: n, timer: timer };
+    showUndoToast(n.title || autoTitle(n.text));
+  }
+
+  function undoDelete() {
+    if (!lastDeleted) return;
+    if (lastDeleted.timer) clearTimeout(lastDeleted.timer);
+    notes.unshift(lastDeleted.note);
+    lastDeleted = null;
+    persistNotes();
+    renderList();
+    headerTitle.textContent = "My Notes (" + notes.length + ")";
+    hideToast();
+    toast("Restored");
   }
 
   function newNote() {
@@ -354,10 +503,33 @@
     statusEl.className = "status" + (live ? " live" : "");
   }
 
+  var toastTimer = null;
   function toast(msg) {
+    if (toastTimer) clearTimeout(toastTimer);
     toastEl.textContent = msg;
     toastEl.className = "toast show";
-    setTimeout(function () { toastEl.className = "toast"; }, 1600);
+    toastTimer = setTimeout(function () { toastEl.className = "toast"; }, 1600);
+  }
+
+  function hideToast() {
+    if (toastTimer) clearTimeout(toastTimer);
+    toastEl.className = "toast";
+    toastEl.onclick = null;
+  }
+
+  function showUndoToast(name) {
+    if (toastTimer) clearTimeout(toastTimer);
+    toastEl.innerHTML = "";
+    var label = document.createElement("span");
+    var short = name.length > 24 ? name.slice(0, 24) + "…" : name;
+    label.textContent = 'Deleted "' + short + '"';
+    var link = document.createElement("span");
+    link.className = "undo-link";
+    link.textContent = "Undo";
+    toastEl.appendChild(label);
+    toastEl.appendChild(link);
+    toastEl.className = "toast undo show";
+    toastEl.onclick = function () { undoDelete(); };
   }
 
   // ---------------------------------------------------------------
@@ -447,8 +619,9 @@
     baseText = noteEl.textContent || "";
 
     recognizing = true;
-    micBtn.textContent = "⏹ Stop Recording";
+    micBtn.textContent = "⏹";
     micBtn.className = "mic-btn recording";
+    if (micHint) micHint.textContent = "Listening… tap to stop";
     setStatus("Listening… speak now", true);
     beginInstance();
   }
@@ -487,8 +660,9 @@
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         recognizing = false;
         setStatus("Microphone blocked. Allow mic access for this site.", false);
-        micBtn.textContent = "🎤 Start Recording";
+        micBtn.textContent = "🎤";
         micBtn.className = "mic-btn";
+        if (micHint) micHint.textContent = "Tap to record";
       } else {
         setStatus("Error: " + e.error, false);
       }
@@ -503,8 +677,9 @@
           setTimeout(function () { if (recognizing) beginInstance(); }, 250);
         }
       } else {
-        micBtn.textContent = "🎤 Start Recording";
+        micBtn.textContent = "🎤";
         micBtn.className = "mic-btn";
+        if (micHint) micHint.textContent = "Tap to record";
         setStatus("Stopped");
       }
     };
@@ -519,8 +694,9 @@
     // finalize the display with a clean pass
     noteEl.textContent = cleanupText(baseText);
     saveDraft();
-    micBtn.textContent = "🎤 Start Recording";
+    micBtn.textContent = "🎤";
     micBtn.className = "mic-btn";
+    if (micHint) micHint.textContent = "Tap to record";
     setStatus("Stopped");
   }
 
@@ -535,7 +711,7 @@
     var text = noteEl.textContent.trim();
     if (!text) { toast("Nothing to copy"); return; }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () { toast("Copied!"); }, function () { legacyCopy(text); });
+      navigator.clipboard.writeText(text).then(function () { toast("Copied!"); buzz(15); }, function () { legacyCopy(text); });
     } else { legacyCopy(text); }
   });
 
@@ -562,10 +738,79 @@
     }
   });
 
-  saveBtn.addEventListener("click", saveCurrent);
+  // ---- shared: download text as a .txt file (with share/clipboard fallback) ----
+  function downloadTextFile(content, filename, successMsg) {
+    try {
+      var b = new Blob([content], { type: "text/plain" });
+      var url = URL.createObjectURL(b);
+      var a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast(successMsg || ("Saved: " + filename));
+    } catch (e) {
+      if (navigator.share) { navigator.share({ text: content }).catch(function () {}); }
+      else if (navigator.clipboard) { navigator.clipboard.writeText(content); toast("Copied to clipboard"); }
+      else { toast("Save failed on this browser"); }
+    }
+  }
+
+  // ---- per-note: save the current editor note as its own file ----
+  fileBtn.addEventListener("click", function () {
+    var text = noteEl.textContent.trim();
+    if (!text) { toast("Nothing to save"); return; }
+    var title = (titleInput.value.trim() || autoTitle(text));
+    var safe = title.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 40) || "note";
+    var stamp = new Date().toISOString().slice(0, 10);
+    var body = title + "\n(" + new Date().toLocaleString() + ")\n\n" + text;
+    downloadTextFile(body, safe + "-" + stamp + ".txt", "Note saved to file");
+    buzz(15);
+  });
+
+  saveBtn.addEventListener("click", function () { saveCurrent(); buzz(15); });
   newBtn.addEventListener("click", newNote);
   listBtn.addEventListener("click", function () {
     if (listView.classList.contains("hidden")) showList(); else showEditor();
+  });
+
+  // ---- search ----
+  searchInput.addEventListener("input", renderList);
+
+  // ---- backup / export all notes ----
+  backupBtn.addEventListener("click", function () {
+    if (!notes.length) { toast("No notes to back up"); return; }
+    var sorted = notes.slice().sort(function (a, b) { return b.updated - a.updated; });
+    var parts = sorted.map(function (n) {
+      var title = n.title || autoTitle(n.text);
+      return "=== " + title + " ===\n(" + fmtDate(n.updated) + ")\n\n" + (n.text || "");
+    });
+    var blob = "VOICE NOTES BACKUP — " + new Date().toLocaleString() + "\n" +
+               notes.length + " note(s)\n\n" + parts.join("\n\n----------------------------------------\n\n");
+    var stamp = new Date().toISOString().slice(0, 10);
+    downloadTextFile(blob, "voice-notes-backup-" + stamp + ".txt", "Backup saved");
+  });
+
+  // ---- manual formatting inserts (into the editor at the end) ----
+  function insertAtEnd(snippet) {
+    var cur = noteEl.textContent;
+    if (cur && !/\n$/.test(cur)) cur += "\n";
+    noteEl.textContent = cur + snippet;
+    saveDraft();
+    // put caret at the end so the user can keep typing
+    try {
+      noteEl.focus();
+      var range = document.createRange();
+      range.selectNodeContents(noteEl);
+      range.collapse(false);
+      var sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+    } catch (e) {}
+  }
+  fmtBullet.addEventListener("click", function () { insertAtEnd("- "); buzz(10); });
+  fmtDivider.addEventListener("click", function () { insertAtEnd("----------\n"); buzz(10); });
+  fmtStamp.addEventListener("click", function () {
+    insertAtEnd(new Date().toLocaleString() + "\n"); buzz(10);
   });
 
   noteEl.addEventListener("input", saveDraft);
